@@ -3,6 +3,7 @@
 
 import os
 import telebot
+import requests
 import random
 import time
 import logging
@@ -11,6 +12,7 @@ from threading import Thread
 
 # ================= TOKENLAR =================
 TELEGRAM_TOKEN = os.getenv("BOT_TOKEN", "8236645335:AAG5paUC631oGqhUp_3zRLHYObQxH8CGgNc")
+OPENROUTER_KEY = os.getenv("OPENROUTER_KEY", "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")
 
 # HTML MODE
 bot = telebot.TeleBot(TELEGRAM_TOKEN, parse_mode="HTML")
@@ -18,8 +20,7 @@ bot = telebot.TeleBot(TELEGRAM_TOKEN, parse_mode="HTML")
 # Flask app for Render
 app = Flask(__name__)
 
-# ================= WEBHOOK (409 xatosini oldini olish) =================
-# Botni polling emas, webhook rejimida ishlatish
+# ================= WEBHOOK =================
 WEBHOOK_URL = f"https://erkinov-ai-bot.onrender.com/{TELEGRAM_TOKEN}"
 
 @app.route(f'/{TELEGRAM_TOKEN}', methods=['POST'])
@@ -40,6 +41,63 @@ STICKERS = [
     "CAACAgIAAxkBAAIBjWbC_WBri-ocw3D_nODoxYHt8QzTAAKvGwACgmcAAUoI1hTx2ZR8vTQE",
 ]
 
+# ================= AI FUNKSIYA (YANGILANGAN) =================
+def get_ai_response(user_message):
+    """OpenRouter API orqali AI javobi olish"""
+    try:
+        headers = {
+            "Authorization": f"Bearer {OPENROUTER_KEY}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://t.me/ErkinovAIBot",
+            "X-Title": "Erkinov AI Bot"
+        }
+        
+        # ISHLASHI KAFOLATLANGAN MODEL
+        payload = {
+            "model": "google/gemini-2.0-flash-exp:free",  # ✅ Bepul va ishlaydi
+            "messages": [
+                {
+                    "role": "system", 
+                    "content": "Siz foydali va do'stona AI assistantsiz. O'zbek tilida aniq, tushunarli va foydali javob bering."
+                },
+                {
+                    "role": "user",
+                    "content": user_message
+                }
+            ],
+            "max_tokens": 600,
+            "temperature": 0.7,
+            "top_p": 0.9
+        }
+        
+        response = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=45
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            return result["choices"][0]["message"]["content"].strip()
+        else:
+            error_msg = f"API xatosi: {response.status_code}"
+            logging.error(f"AI API xatosi: {error_msg}")
+            
+            # Oddiy javob qaytarish
+            simple_responses = [
+                "Kechirasiz, AI hozircha javob bera olmaydi. Qisqa savol bering.",
+                "Texnik xato. Iltimos, savolingizni qayta yozing.",
+                "AI tizimida muammo. Tez orada tuzatiladi."
+            ]
+            return random.choice(simple_responses)
+            
+    except requests.exceptions.Timeout:
+        return "Javob kutish vaqti oshib ketdi. Iltimos, qisqa savol bering."
+    except Exception as e:
+        logging.error(f"AI xatosi: {str(e)}")
+        return "Texnik xato yuz berdi. Keyinroq urinib ko'ring."
+
 # ================= START =================
 @bot.message_handler(commands=['start'])
 def start(message):
@@ -51,43 +109,128 @@ def start(message):
     bot.reply_to(
         message,
         "🤖 <b>Erkinov AI Bot</b>\n\n"
-        "✅ <i>Bot Render.com da ishlayapti!</i>\n"
-        "📍 24/7 online\n"
-        "📍 Webhook rejimi\n\n"
-        "Savol yozing yoki /help"
+        "🎯 <i>Men OpenRouter AI bilan ishlayman!</i>\n\n"
+        "📝 <b>Savolingizni yozing:</b>\n"
+        "• Dasturlash\n"
+        "• Matematika\n"
+        "• Tarix\n"
+        "• Yoki istalgan mavzu\n\n"
+        "📍 /help - Yordam\n"
+        "📍 /info - Bot haqida\n\n"
+        "✅ <i>Render.com da 24/7 online</i>"
     )
 
+# ================= HELP =================
 @bot.message_handler(commands=['help'])
 def help_cmd(message):
-    bot.reply_to(message, "📝 Faqat savol yozing, men javob beraman!")
+    bot.reply_to(
+        message,
+        "🆘 <b>Yordam:</b>\n\n"
+        "1. Faqat savol yozing - AI javob beradi\n"
+        "2. /start - Boshlash\n"
+        "3. /info - Bot haqida\n"
+        "4. /ping - Bot faolligini tekshirish\n\n"
+        "🤖 <i>AI Model: Gemini 2.0 Flash</i>"
+    )
 
-# ================= ASOSIY HANDLER =================
+# ================= INFO =================
+@bot.message_handler(commands=['info', 'about'])
+def info_cmd(message):
+    bot.reply_to(
+        message,
+        "📊 <b>Bot haqida:</b>\n\n"
+        "🤖 <b>Erkinov AI Bot</b>\n"
+        "👨‍💻 Yaratuvchi: Mehruzbek Erkinov\n"
+        "🌐 Hosting: Render.com\n"
+        "⚡ Status: 24/7 Online\n"
+        "🧠 AI: OpenRouter + Gemini 2.0\n"
+        "🔗 Link: @ErkinovAIBot\n\n"
+        "✅ <i>Barcha savollaringizga javob beraman!</i>"
+    )
+
+# ================= PING =================
+@bot.message_handler(commands=['ping', 'status'])
+def ping_cmd(message):
+    import datetime
+    now = datetime.datetime.now()
+    bot.reply_to(
+        message,
+        f"🟢 <b>Bot faol!</b>\n\n"
+        f"🕐 Vaqt: {now.strftime('%H:%M:%S')}\n"
+        f"📅 Sana: {now.strftime('%d.%m.%Y')}\n"
+        f"🌐 Server: Render.com\n"
+        f"⚡ Holat: Online 24/7"
+    )
+
+# ================= ASOSIY HANDLER (AI JAVOB) =================
 @bot.message_handler(func=lambda m: True)
-def handle(m):
-    if not m.text:
+def handle_message(message):
+    if not message.text:
         return
     
-    text = m.text.lower()
+    user_text = message.text.strip()
     
-    if any(x in text for x in ["salom", "hello", "hi"]):
-        bot.reply_to(m, "👋 Salom! Savolingizni yozing.")
+    # Maxsus so'zlar
+    text_lower = user_text.lower()
+    
+    if any(x in text_lower for x in ["salom", "hello", "hi", "assalom"]):
+        bot.reply_to(message, "👋 Salom! Savolingizni yozing, men AI yordamida javob beraman.")
         return
     
-    if any(x in text for x in ["kim yaratdi", "developer"]):
-        bot.reply_to(m, "🤖 Mehruzbek Erkinov")
+    if any(x in text_lower for x in ["kim yaratdi", "yaratuvchi", "developer", "kim qildi"]):
+        bot.reply_to(message, "🤖 Bu bot Mehruzbek Erkinov tomonidan yaratilgan.")
         return
     
-    # Echo response
-    bot.reply_to(m, f"📨 Siz: <b>{m.text}</b>\n\n✅ Bot Render.com da ishlayapti!")
+    if any(x in text_lower for x in ["rahmat", "thanks", "thank you", "tashakkur"]):
+        bot.reply_to(message, "❤️ Sizga ham rahmat! Yana savolingiz bo'lsa yozing.")
+        return
+    
+    # Typing effekti
+    bot.send_chat_action(message.chat.id, 'typing')
+    
+    # Kutish xabarini yuborish
+    wait_msg = bot.reply_to(message, "⏳ <i>AI javob tayyorlanmoqda...</i>")
+    
+    try:
+        # AI javobi
+        ai_response = get_ai_response(user_text)
+        
+        # Kutish xabarini o'chirish
+        try:
+            bot.delete_message(message.chat.id, wait_msg.message_id)
+        except:
+            pass
+        
+        # Sticker
+        try:
+            bot.send_sticker(message.chat.id, random.choice(STICKERS))
+        except:
+            pass
+        
+        # Chiroyli formatdagi javob
+        formatted_response = f"""
+🧠 <b>AI Javobi:</b>
+
+{ai_response}
+
+━━━━━━━━━━━━━━
+🤖 <b>Erkinov AI</b> | @ErkinovAIBot
+        """
+        
+        bot.reply_to(message, formatted_response)
+        
+    except Exception as e:
+        logging.error(f"Xatolik: {str(e)}")
+        bot.reply_to(message, "❌ Kechirasiz, xatolik yuz berdi. Iltimos, keyinroq urinib ko'ring.")
 
 # ================= FLASK ROUTES =================
 @app.route('/')
 def home():
-    return "🤖 Erkinov Bot - Webhook rejimida ishlayapti!"
+    return "🤖 Erkinov AI Bot - OpenRouter AI bilan ishlaydi!"
 
 @app.route('/health')
 def health():
-    return "OK", 200
+    return "✅ OK - Bot va AI faol", 200
 
 @app.route('/setwebhook')
 def set_webhook():
@@ -99,35 +242,32 @@ def set_webhook():
     except Exception as e:
         return f"❌ Xato: {str(e)}"
 
-@app.route('/removewebhook')
-def remove_webhook():
-    try:
-        bot.remove_webhook()
-        return "✅ Webhook o'chirildi"
-    except Exception as e:
-        return f"❌ Xato: {str(e)}"
-
 # ================= MAIN =================
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+    # Logging sozlash
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
     
     print("====================================")
-    print("🤖 ERKINOV BOT - WEBHOOK MODE")
+    print("🤖 ERKINOV AI BOT - RENDER.COM")
+    print("🧠 AI: OpenRouter + Gemini 2.0 Flash")
+    print("🌐 Webhook Mode: Active")
     print("====================================")
-    
-    # Portni olish
-    port = int(os.getenv("PORT", 10000))
     
     # Webhook ni o'rnatish
     try:
         print("📡 Webhook o'rnatilmoqda...")
         bot.remove_webhook()
-        time.sleep(1)
+        time.sleep(2)
         bot.set_webhook(url=WEBHOOK_URL)
         print(f"✅ Webhook o'rnatildi: {WEBHOOK_URL}")
     except Exception as e:
         print(f"⚠️ Webhook xatosi: {e}")
-        print("ℹ️ Polling rejimiga o'tiladi...")
+    
+    # Server port
+    port = int(os.getenv("PORT", 10000))
     
     # Flask server
     print(f"🚀 Server {port} portda ishga tushmoqda...")
