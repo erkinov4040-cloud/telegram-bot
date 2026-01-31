@@ -3,11 +3,10 @@
 
 import os
 import telebot
-import requests
 import random
 import time
 import logging
-from flask import Flask
+from flask import Flask, request  # ✅ REQUEST QO'SHILDI
 from threading import Thread
 
 # ================= TOKENLAR =================
@@ -24,7 +23,7 @@ WEBHOOK_URL = f"https://erkinov-ai-bot.onrender.com/{TELEGRAM_TOKEN}"
 
 @app.route(f'/{TELEGRAM_TOKEN}', methods=['POST'])
 def webhook():
-    if request.headers.get('content-type') == 'application/json':
+    if request.headers.get('content-type') == 'application/json':  # ✅ ENDI ISHLAYDI
         json_string = request.get_data().decode('utf-8')
         update = telebot.types.Update.de_json(json_string)
         bot.process_new_updates([update])
@@ -149,6 +148,16 @@ def home():
 def health():
     return "OK", 200
 
+@app.route('/setwebhook')
+def set_webhook():
+    try:
+        bot.remove_webhook()
+        time.sleep(1)
+        bot.set_webhook(url=WEBHOOK_URL)
+        return f"✅ Webhook o'rnatildi: {WEBHOOK_URL}"
+    except Exception as e:
+        return f"❌ Xato: {str(e)}"
+
 # ================= MAIN =================
 if __name__ == "__main__":
     # Logging
@@ -156,7 +165,7 @@ if __name__ == "__main__":
     
     print("="*50)
     print("🤖 ERKINOV AI BOT")
-    print("✅ Simple Version")
+    print("✅ Simple Version - Fixed")
     print("🌐 Webhook Mode")
     print("="*50)
     
