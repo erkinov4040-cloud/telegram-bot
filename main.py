@@ -6,8 +6,17 @@ import json
 import time
 import logging
 import requests
-from flask import Flask, request
 import telebot
+from flask import Flask, request
+from PIL import Image
+import tempfile
+import subprocess
+
+# Ovoz → matnga
+import whisper
+
+# Rasm → OCR
+from pytesseract import image_to_string
 
 # ================= CONFIG =================
 TELEGRAM_TOKEN = "8236645335:AAG5paUC631oGqhUp_3zRLHYObQxH8CGgNc"
@@ -79,7 +88,7 @@ def ask_groq(question):
         logging.error(f"GROQ ERROR: {e}")
         return "❌ AI server bilan bog'lanishda xato yuz berdi."
 
-# ================= COMMANDS =================
+# ================= START & HELP =================
 @bot.message_handler(commands=['start'])
 def start(msg):
     update_user(msg.from_user.id)
@@ -148,17 +157,77 @@ def admin_panel(msg):
 """
     bot.reply_to(msg, text)
 
-# ================= NON-TEXT HANDLER (SEN SO'RAGAN) =================
-@bot.message_handler(content_types=['voice', 'video', 'photo', 'sticker', 'audio', 'document'])
-def non_text_handler(msg):
-    bot.send_message(
-        msg.chat.id,
-        "❌ Kechirasiz, hozircha faqat matnli savollarga javob bera olaman.\n\n"
-        "Iltimos, savolingizni yozma shaklda yuboring ✍️"
-    )
+# ================= MEDIA HANDLER (Voice, Photo, Video) =================
+@bot.message_handler(content_types=['voice', 'photo', 'video'])
+def media_handler(msg):
+    update_user(msg.from_user.id)
+    bot.send_chat_action(msg.chat.id, "typing")
 
-# ================= AI HANDLER (FAKAT TEXT) =================
-@bot.message_handler(content_types=['text'])   # ❗ MUHIM O'ZGARTIRILDI
+    text = ""
+
+    # Ovozli habar
+    if msg.content_type == "voice":
+        file_info = bot.get_file(msg.voice.file_id)
+        file_path = file_info.file_path
+        downloaded_file = bot.download_file(file_path)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".ogg") as f:
+            f.write(downloaded_file)
+            temp_path = f.name
+        
+        model = whisper.load_model("small")
+        result = model.transcribe(temp_path)
+        text = result["text"]
+
+    # Rasmli habar
+    elif msg.content_type == "photo":
+        file_info = bot.get_file(msg.photo[-1].file_id)
+        file_path = file_info.file_path
+        downloaded_file = bot.download_file(file_path)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as f:
+            f.write(downloaded_file)
+            temp_path = f.name
+        
+        image = Image.open(temp_path)
+        text = image_to_string(image, lang="eng")  # kerak bo'lsa 'uzb+eng'
+
+    # Video habar
+    elif msg.content_type == "video":
+        file_info = bot.get_file(msg.video.file_id)
+        file_path = file_info.file_path
+        downloaded_file = bot.download_file(file_path)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as f:
+            f.write(downloaded_file)
+            temp_path = f.name
+        
+        # Video dan audio ajratish
+        audio_path = temp_path + ".wav"
+        subprocess.run([
+            "ffmpeg", "-y", "-i", temp_path,
+            "-ar", "16000", "-ac", "1", "-vn", audio_path
+        ], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+
+        # Whisper bilan transkript
+        model = whisper.load_model("small")
+        result = model.transcribe(audio_path)
+        text = result["text"]
+
+    # Agar matn bo‘lmasa
+    if text.strip() == "":
+        bot.send_message(msg.chat.id, "❌ Hech qanday matn topilmadi. Iltimos qayta yuboring.")
+        return
+
+    # AI javob
+    answer = ask_groq(text)
+    reply = f"""
+{answer}
+
+━━━━━━━━━━━━━━
+🤖 {BOT_NAME} | {BOT_USERNAME}
+"""
+    bot.send_message(msg.chat.id, reply)
+
+# ================= AI HANDLER (TEXT) =================
+@bot.message_handler(content_types=['text'])
 def ai_handler(msg):
     update_user(msg.from_user.id)
     bot.send_chat_action(msg.chat.id, "typing")
@@ -166,7 +235,6 @@ def ai_handler(msg):
     logging.info(f"{msg.from_user.id}: {msg.text}")
 
     answer = ask_groq(msg.text)
-
     reply = f"""
 {answer}
 
@@ -197,7 +265,7 @@ if __name__ == "__main__":
     print("="*50)
     print("🤖 ERKINOV PROFESSIONAL AI BOT")
     print("🧠 GROQ Llama 3.3 70B")
-    print("🌐 Webhook Mode")
+    print("🌐 Webhook Mode + Voice, OCR, Video")
     print("="*50)
     
     port = int(os.getenv("PORT", 10000))
