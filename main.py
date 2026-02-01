@@ -10,9 +10,9 @@ from flask import Flask, request
 import telebot
 
 # ================= CONFIG =================
-TELEGRAM_TOKEN = "8236645335:AAG5paUC631oGqhUp_3zRLHYObQxH8CGgNc"  # ⚠️ TOKEN QO'YILDI
-GROQ_API_KEY = "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"  # ⚠️ KEY QO'YILDI
-ADMIN_ID = 7447606350  # ⚠️ SIZNING ID QO'YILDI
+TELEGRAM_TOKEN = "8236645335:AAG5paUC631oGqhUp_3zRLHYObQxH8CGgNc"
+GROQ_API_KEY = "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"
+ADMIN_ID = 7447606350
 
 BOT_NAME = "Erkinov AI"
 BOT_USERNAME = "@ErkinovAIBOT"
@@ -84,7 +84,7 @@ def ask_groq(question):
 def start(msg):
     update_user(msg.from_user.id)
     text = f"""
-<b> ✨ {BOT_NAME}</b>
+<b>✨ {BOT_NAME}</b>
 
 Salom! Men sizga savollar, tarjima, kod va AI maslahatlarida yordam bera olaman.
 
@@ -148,8 +148,17 @@ def admin_panel(msg):
 """
     bot.reply_to(msg, text)
 
-# ================= AI HANDLER =================
-@bot.message_handler(func=lambda m: True)
+# ================= NON-TEXT HANDLER (SEN SO'RAGAN) =================
+@bot.message_handler(content_types=['voice', 'video', 'photo', 'sticker', 'audio', 'document'])
+def non_text_handler(msg):
+    bot.send_message(
+        msg.chat.id,
+        "❌ Kechirasiz, hozircha faqat matnli savollarga javob bera olaman.\n\n"
+        "Iltimos, savolingizni yozma shaklda yuboring ✍️"
+    )
+
+# ================= AI HANDLER (FAKAT TEXT) =================
+@bot.message_handler(content_types=['text'])   # ❗ MUHIM O'ZGARTIRILDI
 def ai_handler(msg):
     update_user(msg.from_user.id)
     bot.send_chat_action(msg.chat.id, "typing")
@@ -159,8 +168,6 @@ def ai_handler(msg):
     answer = ask_groq(msg.text)
 
     reply = f"""
-
-
 {answer}
 
 ━━━━━━━━━━━━━━
