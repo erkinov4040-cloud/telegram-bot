@@ -158,9 +158,10 @@ def ai_handler(msg):
 
     answer = ask_groq(msg.text)
 
-   reply = f"""
-        {answer}
+    reply = f"""
 
+
+{answer}
 
 ━━━━━━━━━━━━━━
 🤖 {BOT_NAME} | {BOT_USERNAME}
