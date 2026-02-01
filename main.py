@@ -5,15 +5,14 @@ import os
 import json
 import time
 import logging
-import random
 import requests
-import telebot
 from flask import Flask, request
+import telebot
 
 # ================= CONFIG =================
-TELEGRAM_TOKEN = "8236645335:AAG5paUC631oGqhUp_3zRLHYObQxH8CGgNc"
-GROQ_API_KEY = "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"
-ADMIN_ID = 7447606350
+TELEGRAM_TOKEN = "8236645335:AAG5paUC631oGqhUp_3zRLHYObQxH8CGgNc"  # ⚠️ TOKEN QO'YILDI
+GROQ_API_KEY = "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"  # ⚠️ KEY QO'YILDI
+ADMIN_ID = 7447606350  # ⚠️ SIZNING ID QO'YILDI
 
 BOT_NAME = "Erkinov AI"
 BOT_USERNAME = "@ErkinovAIBOT"
@@ -21,8 +20,6 @@ DEVELOPER = "Erkinov Mehruzbek"
 
 MODEL = "llama-3.3-70b-versatile"
 SYSTEM_PROMPT = "Siz professional AI assistantsiz. O'zbek tilida aniq va to'liq javob bering."
-
-EMOJIS = ["✨", "💡", "🤖", "🧠", "🚀"]
 
 # ================= LOGGING =================
 logging.basicConfig(
@@ -82,29 +79,17 @@ def ask_groq(question):
         logging.error(f"GROQ ERROR: {e}")
         return "❌ AI server bilan bog'lanishda xato yuz berdi."
 
-# ================= HELPERS =================
-def format_response(answer):
-    emoji = random.choice(EMOJIS)
-    return f"""
-{emoji} <b>Javob:</b>
-
-{answer}
-
-━━━━━━━━━━━━━━
-🤖 {BOT_NAME} | {BOT_USERNAME}
-"""
-
 # ================= COMMANDS =================
 @bot.message_handler(commands=['start'])
 def start(msg):
     update_user(msg.from_user.id)
-    bot.send_chat_action(msg.chat.id, "typing")
     text = f"""
-
+<b> ✨ {BOT_NAME}</b>
 
 Salom! Men sizga savollar, tarjima, kod va AI maslahatlarida yordam bera olaman.
 
 Savolingizni yozing 👇
+
 ━━━━━━━━━━━━━━
 👨‍💻 Developer: <b>{DEVELOPER}</b>
 """
@@ -112,7 +97,6 @@ Savolingizni yozing 👇
 
 @bot.message_handler(commands=['help'])
 def help_cmd(msg):
-    bot.send_chat_action(msg.chat.id, "typing")
     text = f"""
 <b>ℹ️ Yordam ({BOT_NAME})</b>
 
@@ -129,14 +113,13 @@ def help_cmd(msg):
 
 @bot.message_handler(commands=['ping'])
 def ping(msg):
-    bot.send_chat_action(msg.chat.id, "typing")
     start = time.time()
+    bot.send_chat_action(msg.chat.id, "typing")
     end = time.time()
     bot.reply_to(msg, f"🏓 Pong! {round((end-start)*1000)} ms")
 
 @bot.message_handler(commands=['stats'])
 def stats(msg):
-    bot.send_chat_action(msg.chat.id, "typing")
     db = load_db()
     users = len(db["users"])
     total = db["total_messages"]
@@ -154,7 +137,6 @@ def stats(msg):
 def admin_panel(msg):
     if msg.from_user.id != ADMIN_ID:
         return bot.reply_to(msg, "⛔ Siz admin emassiz!")
-    bot.send_chat_action(msg.chat.id, "typing")
     db = load_db()
     text = f"""
 <b>👑 ADMIN PANEL</b>
@@ -166,23 +148,24 @@ def admin_panel(msg):
 """
     bot.reply_to(msg, text)
 
-# ================= STICKER HANDLER =================
-@bot.message_handler(content_types=['sticker'])
-def sticker_handler(msg):
-    bot.send_chat_action(msg.chat.id, "typing")
-    time.sleep(1)  # feel like AI is thinking
-    bot.reply_to(msg, "🤖 Stickerni oldim! Siz ham shunday yuborishingiz mumkin.")
-
 # ================= AI HANDLER =================
 @bot.message_handler(func=lambda m: True)
 def ai_handler(msg):
     update_user(msg.from_user.id)
     bot.send_chat_action(msg.chat.id, "typing")
-    time.sleep(random.uniform(0.5, 1.5))  # natural typing delay
 
     logging.info(f"{msg.from_user.id}: {msg.text}")
+
     answer = ask_groq(msg.text)
-    reply = format_response(answer)
+
+    reply = f"""
+
+
+{answer}
+
+━━━━━━━━━━━━━━
+🤖 {BOT_NAME} | {BOT_USERNAME}
+"""
     bot.reply_to(msg, reply)
 
 # ================= WEBHOOK =================
@@ -207,7 +190,7 @@ if __name__ == "__main__":
     print("="*50)
     print("🤖 ERKINOV PROFESSIONAL AI BOT")
     print("🧠 GROQ Llama 3.3 70B")
-    print("✨ Format: '✨ Javob:'")
+    print("🌐 Webhook Mode")
     print("="*50)
     
     port = int(os.getenv("PORT", 10000))
