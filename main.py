@@ -160,7 +160,7 @@ def ai_handler(msg):
     answer = ask_groq(msg.text)
 
     reply = f"""
-<b>🧠 Javob:</b>
+
 
 {answer}
 
