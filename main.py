@@ -84,13 +84,12 @@ def ask_groq(question):
 def start(msg):
     update_user(msg.from_user.id)
     text = f"""
-<b>🤖 {BOT_NAME}</b>
+<b> ✨ {BOT_NAME}</b>
 
-━━━━━━━━━━━━━━
-👋 Assalomu alaykum!
-Bu bot sun'iy intellekt yordamida savollarga javob beradi, tarjima qiladi va yordam beradi.
+Salom! Men sizga savollar, tarjima, kod va AI maslahatlarida yordam bera olaman.
 
-📌 Savolingizni yozing.
+Savolingizni yozing 👇
+
 ━━━━━━━━━━━━━━
 👨‍💻 Developer: <b>{DEVELOPER}</b>
 """
