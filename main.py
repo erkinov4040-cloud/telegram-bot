@@ -5,6 +5,7 @@ import os
 import json
 import time
 import logging
+import random
 import requests
 import telebot
 from flask import Flask, request
@@ -20,6 +21,8 @@ DEVELOPER = "Erkinov Mehruzbek"
 
 MODEL = "llama-3.3-70b-versatile"
 SYSTEM_PROMPT = "Siz professional AI assistantsiz. O'zbek tilida aniq va to'liq javob bering."
+
+EMOJIS = ["✨", "💡", "🤖", "🧠", "🚀"]
 
 # ================= LOGGING =================
 logging.basicConfig(
@@ -79,18 +82,29 @@ def ask_groq(question):
         logging.error(f"GROQ ERROR: {e}")
         return "❌ AI server bilan bog'lanishda xato yuz berdi."
 
+# ================= HELPERS =================
+def format_response(answer):
+    emoji = random.choice(EMOJIS)
+    return f"""
+{emoji} <b>Javob:</b>
+
+{answer}
+
+━━━━━━━━━━━━━━
+🤖 {BOT_NAME} | {BOT_USERNAME}
+"""
+
 # ================= COMMANDS =================
 @bot.message_handler(commands=['start'])
 def start(msg):
     update_user(msg.from_user.id)
+    bot.send_chat_action(msg.chat.id, "typing")
     text = f"""
-<b>🤖 {BOT_NAME}</b>
 
-━━━━━━━━━━━━━━
-👋 Assalomu alaykum!
-Bu bot sun'iy intellekt yordamida savollarga javob beradi, tarjima qiladi va yordam beradi.
 
-📌 Savolingizni yozing.
+Salom! Men sizga savollar, tarjima, kod va AI maslahatlarida yordam bera olaman.
+
+Savolingizni yozing 👇
 ━━━━━━━━━━━━━━
 👨‍💻 Developer: <b>{DEVELOPER}</b>
 """
@@ -98,6 +112,7 @@ Bu bot sun'iy intellekt yordamida savollarga javob beradi, tarjima qiladi va yor
 
 @bot.message_handler(commands=['help'])
 def help_cmd(msg):
+    bot.send_chat_action(msg.chat.id, "typing")
     text = f"""
 <b>ℹ️ Yordam ({BOT_NAME})</b>
 
@@ -114,13 +129,14 @@ def help_cmd(msg):
 
 @bot.message_handler(commands=['ping'])
 def ping(msg):
-    start = time.time()
     bot.send_chat_action(msg.chat.id, "typing")
+    start = time.time()
     end = time.time()
     bot.reply_to(msg, f"🏓 Pong! {round((end-start)*1000)} ms")
 
 @bot.message_handler(commands=['stats'])
 def stats(msg):
+    bot.send_chat_action(msg.chat.id, "typing")
     db = load_db()
     users = len(db["users"])
     total = db["total_messages"]
@@ -138,6 +154,7 @@ def stats(msg):
 def admin_panel(msg):
     if msg.from_user.id != ADMIN_ID:
         return bot.reply_to(msg, "⛔ Siz admin emassiz!")
+    bot.send_chat_action(msg.chat.id, "typing")
     db = load_db()
     text = f"""
 <b>👑 ADMIN PANEL</b>
@@ -149,24 +166,23 @@ def admin_panel(msg):
 """
     bot.reply_to(msg, text)
 
+# ================= STICKER HANDLER =================
+@bot.message_handler(content_types=['sticker'])
+def sticker_handler(msg):
+    bot.send_chat_action(msg.chat.id, "typing")
+    time.sleep(1)  # feel like AI is thinking
+    bot.reply_to(msg, "🤖 Stickerni oldim! Siz ham shunday yuborishingiz mumkin.")
+
 # ================= AI HANDLER =================
 @bot.message_handler(func=lambda m: True)
 def ai_handler(msg):
     update_user(msg.from_user.id)
     bot.send_chat_action(msg.chat.id, "typing")
+    time.sleep(random.uniform(0.5, 1.5))  # natural typing delay
 
     logging.info(f"{msg.from_user.id}: {msg.text}")
-
     answer = ask_groq(msg.text)
-
-    reply = f"""
-✨ <b>Javob:</b>
-
-{answer}
-
-━━━━━━━━━━━━━━
-🤖 {BOT_NAME} | {BOT_USERNAME}
-"""
+    reply = format_response(answer)
     bot.reply_to(msg, reply)
 
 # ================= WEBHOOK =================
