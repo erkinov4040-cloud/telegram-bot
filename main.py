@@ -6,8 +6,8 @@ import json
 import time
 import logging
 import requests
-from flask import Flask, request
 import telebot
+from flask import Flask, request
 
 # ================= CONFIG =================
 TELEGRAM_TOKEN = "8236645335:AAG5paUC631oGqhUp_3zRLHYObQxH8CGgNc"
@@ -84,12 +84,13 @@ def ask_groq(question):
 def start(msg):
     update_user(msg.from_user.id)
     text = f"""
-<b>✨ {BOT_NAME}</b>
+<b>🤖 {BOT_NAME}</b>
 
-Salom! Men sizga savollar, tarjima, kod va AI maslahatlarida yordam bera olaman.
+━━━━━━━━━━━━━━
+👋 Assalomu alaykum!
+Bu bot sun'iy intellekt yordamida savollarga javob beradi, tarjima qiladi va yordam beradi.
 
-Savolingizni yozing 👇
-
+📌 Savolingizni yozing.
 ━━━━━━━━━━━━━━
 👨‍💻 Developer: <b>{DEVELOPER}</b>
 """
@@ -148,17 +149,8 @@ def admin_panel(msg):
 """
     bot.reply_to(msg, text)
 
-# ================= NON-TEXT HANDLER (SEN SO'RAGAN) =================
-@bot.message_handler(content_types=['voice', 'video', 'photo', 'sticker', 'audio', 'document'])
-def non_text_handler(msg):
-    bot.send_message(
-        msg.chat.id,
-        "❌ Kechirasiz, hozircha faqat matnli savollarga javob bera olaman.\n\n"
-        "Iltimos, savolingizni yozma shaklda yuboring ✍️"
-    )
-
-# ================= AI HANDLER (FAKAT TEXT) =================
-@bot.message_handler(content_types=['text'])   # ❗ MUHIM O'ZGARTIRILDI
+# ================= AI HANDLER =================
+@bot.message_handler(func=lambda m: True)
 def ai_handler(msg):
     update_user(msg.from_user.id)
     bot.send_chat_action(msg.chat.id, "typing")
@@ -168,6 +160,8 @@ def ai_handler(msg):
     answer = ask_groq(msg.text)
 
     reply = f"""
+✨ <b>Javob:</b>
+
 {answer}
 
 ━━━━━━━━━━━━━━
@@ -197,7 +191,7 @@ if __name__ == "__main__":
     print("="*50)
     print("🤖 ERKINOV PROFESSIONAL AI BOT")
     print("🧠 GROQ Llama 3.3 70B")
-    print("🌐 Webhook Mode")
+    print("✨ Format: '✨ Javob:'")
     print("="*50)
     
     port = int(os.getenv("PORT", 10000))
