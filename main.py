@@ -196,7 +196,7 @@ if __name__ == "__main__":
     render_url = os.getenv("RENDER_EXTERNAL_URL")
     if not render_url:
         # MUHIM: Bu yerga Render'da berilgan URL ni yozing
-        render_url = "https://sizning-app-nomi.onrender.com"  # 👈 O'ZGARTIRISH KERAK!
+        render_url = "https://erkinov-ai-bot.onrender.com"
         print("⚠️ RENDER_EXTERNAL_URL topilmadi, lokal URL ishlatiladi:", render_url)
 
     webhook_url = f"{render_url}/{TELEGRAM_TOKEN}"
