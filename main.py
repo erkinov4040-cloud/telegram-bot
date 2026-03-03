@@ -9,14 +9,10 @@ import requests
 from flask import Flask, request
 import telebot
 
-# ================= MUHIT O'ZGARUVCHILARI =================
-TELEGRAM_TOKEN = os.getenv("BOT_TOKEN")           # Render environment variable
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")           # Render environment variable
-ADMIN_ID = int(os.getenv("ADMIN_ID", 0))           # Render environment variable
-
-# Agar environment variable'lar to'g'ri sozlanmagan bo'lsa, xatolik chiqarish
-if not TELEGRAM_TOKEN or not GROQ_API_KEY or not ADMIN_ID:
-    raise ValueError("BOT_TOKEN, GROQ_API_KEY va ADMIN_ID environment variable'lari to'liq sozlanishi kerak!")
+# ================= TOKEN VA KALITLAR (TO'G'RIDAN-TO'G'RI) =================
+TELEGRAM_TOKEN = "8236645335:AAG5paUC631oGqhUp_3zRLHYObQxH8CGgNc"
+GROQ_API_KEY = "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"
+ADMIN_ID = 7447606350
 
 BOT_NAME = "Erkinov AI"
 BOT_USERNAME = "@ErkinovAIBOT"
@@ -196,20 +192,22 @@ if __name__ == "__main__":
     print("🌐 Webhook Mode")
     print("="*50)
 
-    # Webhook URL ni aniqlash (Renderda RENDER_EXTERNAL_URL mavjud)
+    # Render URL (o'zingizning app nomingiz bilan almashtiring)
     render_url = os.getenv("RENDER_EXTERNAL_URL")
     if not render_url:
-        # Agar lokalda test qilayotgan bo'lsangiz, o'z URL'ingizni yozing
-        render_url = "https://sizning-app-nomi.onrender.com"  # O'zgartirishni unutmang!
+        # MUHIM: Bu yerga Render'da berilgan URL ni yozing
+        render_url = "https://sizning-app-nomi.onrender.com"  # 👈 O'ZGARTIRISH KERAK!
         print("⚠️ RENDER_EXTERNAL_URL topilmadi, lokal URL ishlatiladi:", render_url)
 
     webhook_url = f"{render_url}/{TELEGRAM_TOKEN}"
 
-    # Eski webhookni o'chirish va yangisini o'rnatish
-    bot.remove_webhook()
-    time.sleep(1)
-    bot.set_webhook(url=webhook_url)
-    print(f"✅ Webhook o'rnatildi: {webhook_url}")
+    try:
+        bot.remove_webhook()
+        time.sleep(1)
+        bot.set_webhook(url=webhook_url)
+        print(f"✅ Webhook o'rnatildi: {webhook_url}")
+    except Exception as e:
+        print(f"❌ Webhook o'rnatishda xatolik: {e}")
 
     port = int(os.getenv("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
