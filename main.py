@@ -1,4 +1,4 @@
-1#!/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 import os
@@ -9,10 +9,14 @@ import requests
 from flask import Flask, request
 import telebot
 
-# ================= CONFIG =================
-TELEGRAM_TOKEN = "8236645335:AAG5paUC631oGqhUp_3zRLHYObQxH8CGgNc"  # ⚠️ TOKEN QO'YILDI
-GROQ_API_KEY = "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"  # ⚠️ KEY QO'YILDI
-ADMIN_ID = 7447606350  # ⚠️ SIZNING ID QO'YILDI
+# ================= MUHIT O'ZGARUVCHILARI =================
+TELEGRAM_TOKEN = os.getenv("BOT_TOKEN")           # Render environment variable
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")           # Render environment variable
+ADMIN_ID = int(os.getenv("ADMIN_ID", 0))           # Render environment variable
+
+# Agar environment variable'lar to'g'ri sozlanmagan bo'lsa, xatolik chiqarish
+if not TELEGRAM_TOKEN or not GROQ_API_KEY or not ADMIN_ID:
+    raise ValueError("BOT_TOKEN, GROQ_API_KEY va ADMIN_ID environment variable'lari to'liq sozlanishi kerak!")
 
 BOT_NAME = "Erkinov AI"
 BOT_USERNAME = "@ErkinovAIBOT"
@@ -84,7 +88,7 @@ def ask_groq(question):
 def start(msg):
     update_user(msg.from_user.id)
     text = f"""
-<b> ✨ {BOT_NAME}</b>
+<b>✨ {BOT_NAME}</b>
 
 Salom! Men sizga savollar, tarjima, kod va AI maslahatlarida yordam bera olaman.
 
@@ -160,7 +164,6 @@ def ai_handler(msg):
 
     reply = f"""
 
-
 {answer}
 
 ━━━━━━━━━━━━━━
@@ -175,7 +178,7 @@ def webhook():
         json_string = request.get_data().decode("utf-8")
         update = telebot.types.Update.de_json(json_string)
         bot.process_new_updates([update])
-    return ""
+    return "OK", 200
 
 @app.route("/")
 def home():
@@ -192,6 +195,21 @@ if __name__ == "__main__":
     print("🧠 GROQ Llama 3.3 70B")
     print("🌐 Webhook Mode")
     print("="*50)
-    
+
+    # Webhook URL ni aniqlash (Renderda RENDER_EXTERNAL_URL mavjud)
+    render_url = os.getenv("RENDER_EXTERNAL_URL")
+    if not render_url:
+        # Agar lokalda test qilayotgan bo'lsangiz, o'z URL'ingizni yozing
+        render_url = "https://sizning-app-nomi.onrender.com"  # O'zgartirishni unutmang!
+        print("⚠️ RENDER_EXTERNAL_URL topilmadi, lokal URL ishlatiladi:", render_url)
+
+    webhook_url = f"{render_url}/{TELEGRAM_TOKEN}"
+
+    # Eski webhookni o'chirish va yangisini o'rnatish
+    bot.remove_webhook()
+    time.sleep(1)
+    bot.set_webhook(url=webhook_url)
+    print(f"✅ Webhook o'rnatildi: {webhook_url}")
+
     port = int(os.getenv("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
